@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -32,6 +33,8 @@ func setupBucket(ctx context.Context, cloud, bucket string) (*blob.Bucket, error
 	switch cloud {
 	case "aws":
 		return setupAWS(ctx, bucket)
+	case "sos":
+		return setupSOS(ctx, bucket)
 	case "gcp":
 		return setupGCP(ctx, bucket)
 	default:
@@ -65,6 +68,23 @@ func setupAWS(ctx context.Context, bucket string) (*blob.Bucket, error) {
 		// 1. AWS_ACCESS_KEY_ID, and
 		// 2. AWS_SECRET_ACCESS_KEY.
 		Credentials: credentials.NewEnvCredentials(),
+	}
+	s := session.Must(session.NewSession(c))
+	return s3blob.OpenBucket(ctx, s, bucket)
+}
+
+// setupSOS creates a connection to Simple Object Storage Service (SOS).
+func setupSOS(ctx context.Context, bucket string) (*blob.Bucket, error) {
+	region := os.Getenv("EXOSCALE_ZONE")
+	if region == "" {
+		region = "ch-dk-2"
+	}
+	api := os.Getenv("EXOSCALE_API_KEY")
+	secret := os.Getenv("EXOSCALE_SECRET_KEY")
+	c := &aws.Config{
+		Region:      &region,
+		Endpoint:    aws.String(fmt.Sprintf("https://sos-%s.exo.io", region)),
+		Credentials: credentials.NewStaticCredentials(api, secret, ""),
 	}
 	s := session.Must(session.NewSession(c))
 	return s3blob.OpenBucket(ctx, s, bucket)
