@@ -21,6 +21,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/google/go-cloud/blob"
 	"github.com/google/go-cloud/blob/gcsblob"
@@ -82,10 +83,23 @@ func setupSOS(ctx context.Context, bucket string) (*blob.Bucket, error) {
 	api := os.Getenv("EXOSCALE_API_KEY")
 	secret := os.Getenv("EXOSCALE_SECRET_KEY")
 	c := &aws.Config{
-		Region:      &region,
-		Endpoint:    aws.String(fmt.Sprintf("https://sos-%s.exo.io", region)),
+		Region: &region,
+		EndpointResolver: &exoscaleResolver{
+			templateEndpoint: "https://sos-%s.exo.io",
+		},
 		Credentials: credentials.NewStaticCredentials(api, secret, ""),
 	}
 	s := session.Must(session.NewSession(c))
 	return s3blob.OpenBucket(ctx, s, bucket)
+}
+
+type exoscaleResolver struct {
+	templateEndpoint string
+}
+
+func (r exoscaleResolver) EndpointFor(service, region string, opts ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {
+	return endpoints.ResolvedEndpoint{
+		URL:           fmt.Sprintf(r.templateEndpoint, region),
+		SigningRegion: region,
+	}, nil
 }
